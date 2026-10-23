@@ -14,6 +14,9 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import android.os.Bundle
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import org.json.JSONObject
 import org.vosk.Model
@@ -37,6 +40,7 @@ class ListenService : Service(), RecognitionListener {
     private val handler = Handler(Looper.getMainLooper())
     private val buffer = StringBuilder()
     private var tts: TextToSpeech? = null
+    private var sr: SpeechRecognizer? = null
     private var ttsReady = false
     private var wakeLock: PowerManager.WakeLock? = null
     private var started = false
@@ -102,6 +106,68 @@ class ListenService : Service(), RecognitionListener {
     }
 
     private fun startDictation() {
+        stopSpeech()
+        mode = Mode.DICTATION
+        buffer.setLength(0)
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            startVoskDictation()
+            return
+        }
+        try {
+            destroySr()
+            val r = SpeechRecognizer.createSpeechRecognizer(this)
+            r.setRecognitionListener(object : android.speech.RecognitionListener {
+                override fun onReadyForSpeech(params: Bundle?) { setStatus("Ti ascolto… parla pure") }
+                override fun onBeginningOfSpeech() {}
+                override fun onRmsChanged(rmsdB: Float) {}
+                override fun onBufferReceived(buffer: ByteArray?) {}
+                override fun onEndOfSpeech() {}
+                override fun onEvent(eventType: Int, params: Bundle?) {}
+                override fun onPartialResults(partialResults: Bundle?) {
+                    val t = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+                    if (!t.isNullOrBlank()) NoteStore.setStatus(this@ListenService, "Sto scrivendo: " + t)
+                }
+                override fun onResults(results: Bundle?) {
+                    val t = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+                    if (!t.isNullOrBlank()) buffer.append(t)
+                    finishDictation()
+                }
+                override fun onError(error: Int) {
+                    if (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
+                        finishDictation()
+                    } else {
+                        setStatus("Errore del riconoscimento ($error), provo l'altro metodo")
+                        destroySr()
+                        startVoskDictation()
+                    }
+                }
+            })
+            sr = r
+            val i = android.content.Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "it-IT")
+            i.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
+            i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L)
+            r.startListening(i)
+            handler.removeCallbacks(finishRunnable)
+            handler.postDelayed(finishRunnable, 25000)
+        } catch (e: Exception) {
+            setStatus("Errore: " + e.message + ", provo l'altro metodo")
+            destroySr()
+            startVoskDictation()
+        }
+    }
+
+    private fun destroySr() {
+        sr?.let {
+            try { it.cancel() } catch (e: Exception) { }
+            try { it.destroy() } catch (e: Exception) { }
+        }
+        sr = null
+    }
+
+    private fun startVoskDictation() {
         val m = model ?: return
         stopSpeech()
         mode = Mode.DICTATION
@@ -121,6 +187,7 @@ class ListenService : Service(), RecognitionListener {
     private fun finishDictation() {
         handler.removeCallbacks(finishRunnable)
         stopSpeech()
+        destroySr()
         val text = buffer.toString().trim()
         if (text.isNotEmpty()) {
             NoteStore.add(this, text)
@@ -239,6 +306,7 @@ class ListenService : Service(), RecognitionListener {
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
         stopSpeech()
+        destroySr()
         model?.close()
         tts?.shutdown()
         wakeLock?.let { if (it.isHeld) it.release() }
