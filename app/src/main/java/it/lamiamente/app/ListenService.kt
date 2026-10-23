@@ -117,7 +117,10 @@ class ListenService : Service(), RecognitionListener {
             destroySr()
             val r = SpeechRecognizer.createSpeechRecognizer(this)
             r.setRecognitionListener(object : android.speech.RecognitionListener {
-                override fun onReadyForSpeech(params: Bundle?) { setStatus("Ti ascolto… parla pure") }
+                override fun onReadyForSpeech(params: Bundle?) {
+                    beep()
+                    setStatus("Ti ascolto… parla pure")
+                }
                 override fun onBeginningOfSpeech() {}
                 override fun onRmsChanged(rmsdB: Float) {}
                 override fun onBufferReceived(buffer: ByteArray?) {}
@@ -175,6 +178,7 @@ class ListenService : Service(), RecognitionListener {
         try {
             val rec = Recognizer(m, 16000.0f)
             speech = SpeechService(rec, 16000.0f).also { it.startListening(this) }
+            beep()
             setStatus("Ti ascolto… parla pure")
             handler.removeCallbacks(finishRunnable)
             handler.postDelayed(finishRunnable, 7000)
@@ -201,8 +205,7 @@ class ListenService : Service(), RecognitionListener {
 
     private fun wakeDetected() {
         stopSpeech()
-        beep()
-        handler.postDelayed({ startDictation() }, 350)
+        handler.post { startDictation() }
     }
 
     // --- RecognitionListener ---
