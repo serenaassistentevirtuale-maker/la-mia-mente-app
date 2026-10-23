@@ -92,8 +92,7 @@ class ListenService : Service(), RecognitionListener {
         stopSpeech()
         mode = Mode.WAKE
         try {
-            val grammar = "[\"ehi mente\", \"ei mente\", \"ehi mia mente\", \"ehi mente ascolta\", \"[unk]\"]"
-            val rec = Recognizer(m, 16000.0f, grammar)
+            val rec = Recognizer(m, 16000.0f)
             speech = SpeechService(rec, 16000.0f).also { it.startListening(this) }
             setStatus("In ascolto: di' «ehi mente»")
         } catch (e: Exception) {
@@ -144,6 +143,7 @@ class ListenService : Service(), RecognitionListener {
     override fun onPartialResult(hypothesis: String?) {
         val p = try { JSONObject(hypothesis ?: "{}").optString("partial") } catch (e: Exception) { "" }
         if (mode == Mode.WAKE) {
+            if (p.isNotBlank()) NoteStore.setStatus(this, "Ho sentito: " + p)
             if (p.contains("mente")) wakeDetected()
         } else if (p.isNotBlank()) {
             handler.removeCallbacks(finishRunnable)
@@ -154,6 +154,7 @@ class ListenService : Service(), RecognitionListener {
     override fun onResult(hypothesis: String?) {
         val t = try { JSONObject(hypothesis ?: "{}").optString("text") } catch (e: Exception) { "" }
         if (mode == Mode.WAKE) {
+            if (t.isNotBlank()) NoteStore.setStatus(this, "Ho sentito: " + t)
             if (t.contains("mente")) wakeDetected()
         } else if (t.isNotBlank()) {
             if (buffer.isNotEmpty()) buffer.append(' ')
