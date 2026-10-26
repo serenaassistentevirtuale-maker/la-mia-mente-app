@@ -3,6 +3,7 @@ package it.lamiamente.app
 import android.Manifest
 import android.app.Activity
 import android.content.Intent
+import android.net.Uri
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Build
@@ -59,6 +60,14 @@ class MainActivity : Activity() {
                 startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
             }
         }
+        val map = Button(this).apply {
+            text = "Apri la mappa e la chat"
+            setOnClickListener { startActivity(Intent(this@MainActivity, WebActivity::class.java)) }
+        }
+        val browser = Button(this).apply {
+            text = "Apri nel browser del telefono"
+            setOnClickListener { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(SITE_URL))) }
+        }
         val hint = TextView(this).apply {
             text = "Per farla funzionare a telefono bloccato, tocca il pulsante qui sopra e metti \"La mia mente\" tra le app senza limiti di batteria."
             textSize = 13f
@@ -81,6 +90,8 @@ class MainActivity : Activity() {
         root.addView(title)
         root.addView(status)
         root.addView(toggle)
+        root.addView(map)
+        root.addView(browser)
         root.addView(battery)
         root.addView(hint)
         root.addView(head)
@@ -136,5 +147,9 @@ class MainActivity : Activity() {
     override fun onPause() {
         handler.removeCallbacks(refresh)
         super.onPause()
+    }
+
+    companion object {
+        const val SITE_URL = "https://claude.ai/artifact/Chs9ns9c5KXfSdFTnbv9De"
     }
 }
