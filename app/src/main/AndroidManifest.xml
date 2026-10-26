@@ -28,10 +28,6 @@
             </intent-filter>
         </activity>
 
-        <activity
-            android:name=".WebActivity"
-            android:exported="false" />
-
         <service
             android:name=".ListenService"
             android:exported="false"

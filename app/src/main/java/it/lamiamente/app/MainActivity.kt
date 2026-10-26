@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
+import androidx.browser.customtabs.CustomTabsIntent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Build
@@ -62,7 +63,10 @@ class MainActivity : Activity() {
         }
         val map = Button(this).apply {
             text = "Apri la mappa e la chat"
-            setOnClickListener { startActivity(Intent(this@MainActivity, WebActivity::class.java)) }
+            setOnClickListener {
+                CustomTabsIntent.Builder().setShowTitle(true).build()
+                    .launchUrl(this@MainActivity, Uri.parse(SITE_URL))
+            }
         }
         val browser = Button(this).apply {
             text = "Apri nel browser del telefono"
